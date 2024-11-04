@@ -1,4 +1,4 @@
-# Major Assignment 2 (Chapter 8)
+# Major Assignment 2 (Chapter 8) - Completed
 
 - Familiarize yourself with different projection methods and their importance in geospatial visualizations.
 - Understand color coding with different scales to effectively communicate data insights.
