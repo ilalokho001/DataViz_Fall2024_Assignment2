@@ -20,39 +20,46 @@
             font-family: sans-serif;
             font-size: large;
             border-radius: 2px;
+            pointer-events: none;
             line-height: 1;
         }
-        
+
         path {
             stroke-width: .5px;
             stroke: black
         }
-        
+
         path:hover {
             opacity: .6;
             stroke: black;
             stroke-width: 4px;
         }
 
-        .container{
+        .container {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
         }
 
-        body{
+        body {
             background: rgb(218, 240, 244);
             font-family: sans-serif;
         }
 
-        .text{
+        .text {
             font-size: 20px;
             font-family: sans-serif;
             text-decoration: underline;
         }
-
-
+        .tick {
+            font-size: 15px;
+        }
+        .line-chart-path { 
+            stroke-width: 2;
+            stroke: rgb(8, 14, 18);
+            fill: none;
+        }
     </style>
 
 </head>
@@ -70,7 +77,7 @@
             <div class="text">Population Change of Towns (Massachusetts) between 1980 and 2010</div>
         </div>
         <div class="fig3">
-            <div class="text">Gini Index in 2019 for Each County</div>
+            <div class="text">Gini Index for Each County</div>
         </div>
     </div>
 
@@ -82,39 +89,39 @@
             height: window.innerHeight
         };
 
-        const svgWidth = window_dims.width*0.8;
-        const svgHeight = window_dims.width*0.6;
+        const svgWidth = window_dims.width * 0.8;
+        const svgHeight = window_dims.width * 0.6;
 
         // a topojson file containing population of each town in different years
         const MA_counties = "./data/towns.topojson"
-            // gini index per county
+        // gini index per county
         const gini_index = "./data/gini_index.csv"
 
         const projections = [
-                d3.geoAzimuthalEqualArea(), //Azimuthal projections project the sphere directly onto a plane.
-                d3.geoAlbersUsa(), // USA conic projection
-                d3.geoAlbers(), // equal-area conic projection
-                d3.geoMercator(), // cylindrical projection
-                d3.geoNaturalEarth1(), // pseudocylindrical projection designed by Tom Patterson
-                d3.geoEqualEarth(), // Equal Earth projection, by Bojan Šavrič et al., 2018.
-                d3.geoConicEqualArea(), //equal-area conic projection
-                d3.geoEquirectangular(), //Cylindrical Projections
-                d3.geoOrthographic()
-            ]
+            d3.geoAzimuthalEqualArea(), //Azimuthal projections project the sphere directly onto a plane.
+            d3.geoAlbersUsa(), // USA conic projection
+            d3.geoAlbers(), // equal-area conic projection
+            d3.geoMercator(), // cylindrical projection
+            d3.geoNaturalEarth1(), // pseudocylindrical projection designed by Tom Patterson
+            d3.geoEqualEarth(), // Equal Earth projection, by Bojan Šavrič et al., 2018.
+            d3.geoConicEqualArea(), //equal-area conic projection
+            d3.geoEquirectangular(), //Cylindrical Projections
+            d3.geoOrthographic()
+        ]
 
-            const generateMap = (containerName, geojson, mapSettings)=> {
-                const { width, height, margin, projection, toolTipData, dataColorScale} = mapSettings;
+        const generateMap = (containerName, geojson, mapSettings) => {
+            const { width, height, margin, projection, toolTipData, dataColorScale, lineChartMethod } = mapSettings;
 
-                const svg = d3.select(containerName).append("svg")
-                    .attr("width", width)
-                    .attr("height", height)
+            const svg = d3.select(containerName).append("svg")
+                .attr("width", width)
+                .attr("height", height)
 
-                const g = svg.append("g")
+            const g = svg.append("g")
 
 
             //Geopath Generator
             const geoPath_generator = d3.geoPath()
-                .projection(projection.fitSize([width-margin,height-margin], geojson))
+                .projection(projection.fitSize([width - margin, height - margin], geojson))
 
 
             // Tooltip
@@ -130,33 +137,107 @@
                     tooltip.transition()
                         .duration(200)
                         .style("opacity", .9)
-                    tooltip.html("<div></div>" 
-                                 + "<div> <span style= \"font-weight: bold;\"> Town: </span> "+ d['properties']['TOWN'].toString() + "</div>" +
-                                 toolTipData(d) +
-                                "<div></div>")
-                        .style("left", (m.clientX + 10).toString() + "px")
-                        .style("top", (m.clientY + 10).toString() + "px");
+                    tooltip.html("<div></div>"
+                        + "<div> <span style= \"font-weight: bold;\"> Town: </span> " + d['properties']['TOWN'].toString() + "</div>" +
+                        toolTipData(d) +
+                        "<div id=\"chart\"></div>" +
+                        "<div></div>")
+
+                    if (lineChartMethod) {
+                        lineChartMethod(d);
+                    }
+
+                    updateTooltipPosition(m);
                 })
                 .on("mousemove", (m, d) => {
+                    updateTooltipPosition(m);
                     tooltip.style("opacity", .9)
-                    .style("left", (m.clientX + 10).toString() + "px")
-                    .style("top", (m.clientY + 10).toString() + "px");
                 })
                 .on("mouseout", (m, d) => {
                     tooltip.transition()
                         .duration(400)
                         .style("opacity", 0)
                 })
-                        
+        }
+
+        function updateTooltipPosition(m) {
+            const tooltip = d3.select("#tooltip");
+            const tooltipWidth = parseInt(tooltip.style("width"));
+            const tooltipHeight = parseInt(tooltip.style("height"));
+
+            let left = m.clientX + 10;
+            let top = m.clientY + 10;
+
+            if (left + tooltipWidth > window.innerWidth){ 
+                left = m.clientX - tooltipWidth - 10; 
             }
+
+            if (top + tooltipHeight > window.innerHeight){ 
+                top = m.clientY - tooltipHeight - 10; 
+            }
+
+            tooltip.style("left", `${left}px`)
+                    .style("top", `${top}px`);
+        }
+        
+        const drawLineChart = (countyData) => {
+            console.log(countyData)
+            if (countyData.length > 0) {
+                
+                countyData = countyData
+                    .map(d => ({
+                        year: +d.year, 
+                        giniIndex: +d['Estimate!!Gini Index']
+                    }))
+                    .sort((a, b) => a.year - b.year);
+
+                const years = countyData.map(d=> d.year);
+                const giniValues = countyData.map(d=> d.giniIndex);
+
+                const margin = {top: 50, right: 50, bottom: 50, left: 50};
+
+                const width = 700 - margin.left - margin.right;
+                const height = 350 - margin.top - margin.bottom;
+
+                const x = d3.scaleTime()
+                            .domain(d3.extent(years))
+                            .range([0, width]);
+
+                const y = d3.scaleLinear()
+                            .domain(d3.extent(giniValues))
+                            .range([height, 0]);
+
+
+                const line = d3.line()
+                            .x((d, i) => x(years[i]))
+                            .y(d => y(d))
+                            .curve(d3.curveBasis)
+
+
+                const svg = d3.select("#chart").append("svg")
+                            .attr("width", width + margin.left + margin.right)
+                            .attr("height", height + margin.top + margin.bottom)
+                            .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+                svg.append("path").datum(giniValues)
+                            .attr("class", "line-chart-path")
+                            .attr("d", line);
+
+                svg.append("g")
+                    .attr("transform", `translate(0, ${height})`)
+                    .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format("d")));
+
+                svg.append("g")
+                    .call(d3.axisLeft(y).ticks(5));
+            }
+        }
 
 
         // open both files
         Promise.all([
             d3.json(MA_counties),
             d3.csv(gini_index)
-        ]).then(data =>
-        {
+        ]).then(data => {
             // topology data
             const topology_data = data[0];
             // gini index data
@@ -169,13 +250,13 @@
 
             //Create lookup dictionary by FIPS code
             const giniDataByFips = {};
-                filtered_csv_data.forEach(d => {
-                    const fips_code = +d['id'].slice(-5); //get fips code from the csv
-                    giniDataByFips[fips_code] = +d['Estimate!!Gini Index'];
+            filtered_csv_data.forEach(d => {
+                const fips_code = +d['id'].slice(-5); //get fips code from the csv
+                giniDataByFips[fips_code] = +d['Estimate!!Gini Index'];
             });
 
             //Color Scales   
-            const colorInterpolator = d3.interpolateRgbBasis(['#d73027','#fc8d59','#fee090','#e0f3f8','#91bfdb','#4575b4'].reverse())
+            const colorInterpolator = d3.interpolateRgbBasis(['#d73027', '#fc8d59', '#fee090', '#e0f3f8', '#91bfdb', '#4575b4'].reverse())
 
             //Data is scaled using log scale
             const logScale = d3.scaleLog()
@@ -198,7 +279,7 @@
             generateMap(".fig1", geojson, {
                 width: svgWidth,
                 height: svgHeight,
-                margin: 10, 
+                margin: 10,
                 projection: projections[3],
                 toolTipData: d => `<div>Population: ${d['properties']['POP1980']} </div>`,
                 dataColorScale: d => logScale(d['properties']['POP1980'])
@@ -207,7 +288,7 @@
             generateMap(".fig2", geojson, {
                 width: svgWidth,
                 height: svgHeight,
-                margin: 10, 
+                margin: 10,
                 projection: projections[1],
                 toolTipData: d => `<div><span style= "font-weight: bold;">Population in 1980:</span> ${d['properties']['POP1980']}
                                  </div>
@@ -220,12 +301,16 @@
             generateMap(".fig3", geojson, {
                 width: svgWidth,
                 height: svgHeight,
-                margin: 10, 
+                margin: 10,
                 projection: projections[4],
                 toolTipData: d => {
                     const fips = +d.properties.FIPS_STCO;
                     const giniIndex = giniDataByFips[fips] !== undefined ? giniDataByFips[fips] : "No data";
-                         return `<div><span style= "font-weight: bold;">Population in 1980:</span> ${d['properties']['POP1980']}
+                    const countyData = csv_data.filter(item => +item.id.slice(-5) === fips);
+                    const countyName = countyData[0] ? countyData[0]['Geographic Area Name'] : 'Unknown';
+                    return `<div><span style= "font-weight: bold;">County Name:</span> ${countyName}
+                                 </div>
+                                <div><span style= "font-weight: bold;">Population in 1980:</span> ${d['properties']['POP1980']}
                                  </div>
                                 <div><span style= "font-weight: bold;">Population in 1990:</span> ${d['properties']['POP1990']}
                                  </div>
@@ -233,15 +318,23 @@
                                  </div>
                                 <div><span style= "font-weight: bold;">Population in 2010:</span> ${d['properties']['POP2010']}
                                  </div>
-                                 <div><span style= "font-weight: bold;"> Gini Index:</span> ${giniIndex}</div>`;
+                                 <div><span style= "font-weight: bold;"> Gini Index in 2019:</span> ${giniIndex}</div>
+                                 <br>
+                                 <div><span style= "font-weight: bold; text-decoration: underline;"> Line Chart of Gini Index Change Over Time</span></div>`;
                 },
                 dataColorScale: d => {
                     const fips = +d.properties.FIPS_STCO;
                     const giniIndex = giniDataByFips[fips];
-                        return giniIndex !== undefined ? sequentialScale(giniIndex) : "#ccc";
+                    return giniIndex !== undefined ? sequentialScale(giniIndex) : "#ccc";
+                },
+                lineChartMethod: d => {
+                    const fips = +d.properties.FIPS_STCO;
+                    const countyData = csv_data.filter(item => +item.id.slice(-5) === fips);
+                    drawLineChart(countyData)
                 }
-                });
-            })
+            });
+
+        })
 
     </script>
 </body>
